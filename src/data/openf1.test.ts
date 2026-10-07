@@ -7,7 +7,7 @@ const ms = (s: number) => Date.UTC(2025, 6, 27, 13, 0, 0) + s * 1000
 /** Shaped like real OpenF1 responses (trimmed): 3 drivers, 2 laps, driver 44 retires. */
 function raw(overrides: Partial<RawRaceData> = {}): RawRaceData {
   return {
-    session: { session_key: 9999, date_start: iso(0), date_end: iso(7200) },
+    session: { session_key: 9999, session_name: 'Race', date_start: iso(0), date_end: iso(7200) },
     name: 'Belgian Grand Prix',
     drivers: [
       { driver_number: 1, name_acronym: 'VER', full_name: 'Max VERSTAPPEN', team_name: 'Red Bull Racing', team_colour: '3671C6' },
@@ -42,6 +42,7 @@ describe('buildTimeline', () => {
   it('maps drivers, without duplicates, with team colours', () => {
     const t = buildTimeline(raw())
     expect(t.id).toBe('openf1-9999')
+    expect(t.kind).toBe('race')
     expect(t.name).toBe('Belgian Grand Prix')
     expect(t.drivers.map((d) => d.code)).toEqual(['VER', 'NOR', 'HAM'])
     expect(t.drivers[0]).toMatchObject({ team: 'Red Bull Racing', teamColor: '#3671C6' })
@@ -77,7 +78,12 @@ describe('buildTimeline', () => {
 
   it('treats a driver that did not start as out from the start', () => {
     const results = raw().results.map((r) => (r.driver_number === 44 ? { ...r, dnf: false, dns: true } : r))
-    expect(buildTimeline(raw({ results })).retirements).toEqual([{ driver: 44, t: ms(10) }])
+    expect(buildTimeline(raw({ results })).retirements).toEqual([{ driver: 44, t: ms(10), dns: true }])
+  })
+
+  it('recognises a sprint', () => {
+    const t = buildTimeline(raw({ session: { ...raw().session, session_name: 'Sprint' } }))
+    expect(t.kind).toBe('sprint')
   })
 
   it('during a live race (no result yet) assumes drivers who stopped lapping are out', () => {
@@ -102,21 +108,24 @@ function mockFetch(routes: Record<string, unknown>) {
 }
 
 describe('fetchRaces', () => {
-  it('lists races that have started, oldest first, with their Grand Prix name', async () => {
+  it('lists races and sprints that have started, oldest first, with their Grand Prix name', async () => {
     const fetchFn = mockFetch({
       '/sessions': [
         { session_key: 2, meeting_key: 20, session_name: 'Race', date_start: '2025-05-04T20:00:00Z', country_name: 'United States', location: 'Miami', year: 2025 },
         { session_key: 1, meeting_key: 10, session_name: 'Race', date_start: '2025-03-16T04:00:00Z', country_name: 'Australia', location: 'Melbourne', year: 2025 },
+        { session_key: 4, meeting_key: 20, session_name: 'Sprint', date_start: '2025-05-03T16:00:00Z', country_name: 'United States', location: 'Miami', year: 2025 },
+        { session_key: 5, meeting_key: 20, session_name: 'Sprint Qualifying', date_start: '2025-05-02T20:30:00Z', country_name: 'United States', location: 'Miami', year: 2025 },
         { session_key: 3, meeting_key: 30, session_name: 'Race', date_start: '2025-12-07T13:00:00Z', country_name: 'UAE', location: 'Yas Marina', year: 2025 },
       ],
       '/meetings': [{ meeting_key: 10, meeting_name: 'Australian Grand Prix' }],
     })
     const races = await fetchRaces(2025, fetchFn, Date.parse('2025-06-01T00:00:00Z'))
     expect(races).toEqual([
-      { id: 'openf1-1', sessionKey: 1, name: 'Australian Grand Prix', date: '2025-03-16T04:00:00Z' },
-      { id: 'openf1-2', sessionKey: 2, name: 'United States (Miami)', date: '2025-05-04T20:00:00Z' },
+      { id: 'openf1-1', sessionKey: 1, kind: 'race', name: 'Australian Grand Prix', date: '2025-03-16T04:00:00Z' },
+      { id: 'openf1-4', sessionKey: 4, kind: 'sprint', name: 'United States (Miami) – Sprint', date: '2025-05-03T16:00:00Z' },
+      { id: 'openf1-2', sessionKey: 2, kind: 'race', name: 'United States (Miami)', date: '2025-05-04T20:00:00Z' },
     ])
-    expect(fetchFn).toHaveBeenCalledWith('https://api.openf1.org/v1/sessions?year=2025&session_name=Race')
+    expect(fetchFn).toHaveBeenCalledWith('https://api.openf1.org/v1/sessions?year=2025&session_type=Race')
   })
 
   it('throws a clear error when the API fails', async () => {
@@ -135,7 +144,7 @@ describe('fetchRaceTimeline', () => {
       '/position': r.positions,
       // no '/session_result' -> 404 -> treated as "no result yet"
     })
-    const race = { id: 'openf1-9999', sessionKey: 9999, name: 'Belgian Grand Prix', date: iso(0) }
+    const race = { id: 'openf1-9999', sessionKey: 9999, kind: 'race' as const, name: 'Belgian Grand Prix', date: iso(0) }
     const t = await fetchRaceTimeline(race, fetchFn)
     expect(t.drivers).toHaveLength(3)
     expect(t.finalOrder).toBeUndefined()

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { buildScoreHistory, type ScoreHistoryEntry } from '../domain/history'
-import { formatLapTime, scorePrediction, type ScoreBreakdown } from '../domain/scoring'
+import { beers, formatLapTime, scorePrediction, type ScoreBreakdown } from '../domain/scoring'
 import { snapshotAt } from '../domain/snapshot'
 import type { Driver, Prediction, RaceSnapshot, RaceTimeline } from '../domain/types'
 import { formatDuration } from '../simulation/clock'
@@ -128,10 +128,12 @@ function RunningOrder({
   driversById: Map<number, Driver>
   score?: ScoreBreakdown
 }) {
-  // Which top-10 slot the selected player predicted for each driver.
+  // Which position the selected player predicted for each driver, and the joker.
   const predictedSlot = new Map<number, string>()
+  let joker: number | null = null
   score?.items.forEach((item) => {
-    if (item.key.startsWith('p') && item.predicted !== null) predictedSlot.set(item.predicted, item.label)
+    if (/^p\d+$/.test(item.key) && item.predicted !== null) predictedSlot.set(item.predicted, item.label)
+    if (item.key === 'joker') joker = item.predicted
   })
 
   return (
@@ -140,7 +142,7 @@ function RunningOrder({
       <ol>
         {snapshot.order.map((driver, i) => {
           const slot = predictedSlot.get(driver)
-          const hit = slot === `P${i + 1}` ? 'exact' : slot && i < 10 ? 'partial' : slot ? 'wrong' : ''
+          const hit = slot === `P${i + 1}` ? 'right' : 'wrong'
           return (
             <li key={driver} className={`running-order__row ${i === 9 ? 'running-order__row--cutoff' : ''}`}>
               <span className="running-order__pos">{i + 1}</span>
@@ -152,12 +154,13 @@ function RunningOrder({
                 </span>
               )}
               {slot && <span className={`badge badge--${hit}`}>you: {slot}</span>}
+              {joker === driver && <span className={`badge badge--${i < 10 ? 'right' : 'joker'}`}>joker</span>}
             </li>
           )
         })}
         {snapshot.retired.map((driver) => (
           <li key={driver} className="running-order__row running-order__row--out">
-            <span className="running-order__pos">OUT</span>
+            <span className="running-order__pos">{snapshot.notStarted.includes(driver) ? 'DNS' : 'OUT'}</span>
             <DriverTag driver={driversById.get(driver)} fallback={driver} />
             <span className="running-order__name">{driversById.get(driver)?.name ?? `#${driver}`}</span>
           </li>
@@ -167,7 +170,7 @@ function RunningOrder({
   )
 }
 
-const STATUS_ICON = { exact: '✓', partial: '≈', wrong: '✗', empty: '·' } as const
+const STATUS_ICON = { right: '✓', wrong: '✗', empty: '·' } as const
 
 function ScoreCard({
   name,
@@ -187,6 +190,9 @@ function ScoreCard({
             {score.total}
           </span>
           <span className="muted"> / {score.max} pts</span>
+          <div className="score-card__beers" title="Bierbonus: 1 beer per 4 points">
+            🍺 {beers(score.total)} {beers(score.total) === 1 ? 'beer' : 'beers'}
+          </div>
         </div>
       </div>
       <ul className="score-items">

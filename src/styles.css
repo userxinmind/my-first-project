@@ -7,8 +7,8 @@
   --text: #f2f3f5;
   --muted: #8b90a0;
   --accent: #e10600; /* F1 red */
-  --exact: #22c55e;
-  --partial: #f5b301;
+  --right: #22c55e;
+  --joker: #f5b301;
   --wrong: #ef4444;
   --purple: #a855f7; /* fastest lap */
   --radius: 14px;
@@ -234,12 +234,12 @@ button:focus-visible {
 .badge--purple {
   background: var(--purple);
 }
-.badge--exact {
-  background: var(--exact);
+.badge--right {
+  background: var(--right);
   color: #04130a;
 }
-.badge--partial {
-  background: var(--partial);
+.badge--joker {
+  background: var(--joker);
   color: #1c1400;
 }
 .badge--wrong {
@@ -314,6 +314,11 @@ legend {
   grid-template-columns: 6rem 1fr;
   align-items: center;
   gap: 0.5rem;
+}
+.hint {
+  margin: -0.15rem 0 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 .driver-select__label {
   font-weight: 700;
@@ -449,6 +454,13 @@ legend {
   color: var(--text);
   animation: pop 0.4s ease-out;
 }
+.score-card__total {
+  text-align: right;
+}
+.score-card__beers {
+  font-weight: 700;
+  color: var(--joker);
+}
 .score-items {
   list-style: none;
   margin: 0.5rem 0 0;
@@ -466,13 +478,9 @@ legend {
   font-weight: 900;
   text-align: center;
 }
-.score-item--exact .score-item__icon,
-.score-item--exact .score-item__points {
-  color: var(--exact);
-}
-.score-item--partial .score-item__icon,
-.score-item--partial .score-item__points {
-  color: var(--partial);
+.score-item--right .score-item__icon,
+.score-item--right .score-item__points {
+  color: var(--right);
 }
 .score-item--wrong .score-item__icon {
   color: var(--wrong);
@@ -534,7 +542,7 @@ legend {
   flex-shrink: 0;
 }
 .feed__delta--up {
-  color: var(--exact);
+  color: var(--right);
 }
 .feed__delta--down {
   color: var(--wrong);

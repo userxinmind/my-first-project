@@ -1,39 +1,32 @@
 import { useState } from 'react'
 import { emptyPrediction } from '../data/predictionsStore'
-import type { Driver, Prediction } from '../domain/types'
+import { DEFAULT_RULES } from '../domain/scoring'
+import type { Driver, Prediction, SessionKind } from '../domain/types'
 import { DriverSelect } from './DriverSelect'
 
 interface Props {
+  kind: SessionKind
   drivers: Driver[]
-  /** Starting grid order, used for the "fill in the grid" shortcut. */
+  /** Starting grid order: for the "fill in the grid" shortcut and the joker rule. */
   grid: number[]
   predictions: Prediction[]
   onChange: (predictions: Prediction[]) => void
 }
 
 /** Add players and fill in their predictions for the selected race. */
-export function PredictionsEditor({ drivers, grid, predictions, onChange }: Props) {
+export function PredictionsEditor({ kind, drivers, grid, predictions, onChange }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(predictions[0]?.playerId ?? null)
   const [newName, setNewName] = useState('')
-  const selected = predictions.find((p) => p.playerId === selectedId) ?? predictions[0]
+  const selected = predictions.find((p) => p.playerId === selectedId) ?? predictions.at(0)
 
   const addPlayer = (e: React.FormEvent) => {
     e.preventDefault()
     const name = newName.trim()
     if (!name) return
-    const player = emptyPrediction(name)
+    const player = emptyPrediction(name, kind)
     onChange([...predictions, player])
     setSelectedId(player.playerId)
     setNewName('')
-  }
-
-  const update = (patch: Partial<Prediction>) =>
-    onChange(predictions.map((p) => (p.playerId === selected.playerId ? { ...p, ...patch } : p)))
-
-  const remove = () => {
-    if (!confirm(`Remove ${selected.playerName}?`)) return
-    onChange(predictions.filter((p) => p.playerId !== selected.playerId))
-    setSelectedId(null)
   }
 
   return (
@@ -64,13 +57,27 @@ export function PredictionsEditor({ drivers, grid, predictions, onChange }: Prop
       {!selected ? (
         <p className="muted">Add yourself (and your friends) to fill in predictions.</p>
       ) : (
-        <PredictionForm drivers={drivers} grid={grid} prediction={selected} onChange={update} onRemove={remove} />
+        <PredictionForm
+          kind={kind}
+          drivers={drivers}
+          grid={grid}
+          prediction={selected}
+          onChange={(patch) =>
+            onChange(predictions.map((p) => (p.playerId === selected.playerId ? { ...p, ...patch } : p)))
+          }
+          onRemove={() => {
+            if (!confirm(`Remove ${selected.playerName}?`)) return
+            onChange(predictions.filter((p) => p.playerId !== selected.playerId))
+            setSelectedId(null)
+          }}
+        />
       )}
     </section>
   )
 }
 
 interface FormProps {
+  kind: SessionKind
   drivers: Driver[]
   grid: number[]
   prediction: Prediction
@@ -78,18 +85,23 @@ interface FormProps {
   onRemove: () => void
 }
 
-function PredictionForm({ drivers, grid, prediction, onChange, onRemove }: FormProps) {
-  const taken = new Set(prediction.top10.filter((d): d is number => d !== null))
+function PredictionForm({ kind, drivers, grid, prediction, onChange, onRemove }: FormProps) {
+  const size = prediction.positions.length
+  const taken = new Set(prediction.positions.filter((d): d is number => d !== null))
   const setSlot = (index: number, driver: number | null) =>
-    onChange({ top10: prediction.top10.map((d, i) => (i === index ? driver : d)) })
+    onChange({ positions: prediction.positions.map((d, i) => (i === index ? driver : d)) })
+
+  // The joker may not be one of the top 10 after qualifying.
+  const minGrid = DEFAULT_RULES.jokerMinGridPosition
+  const jokerCandidates = grid.slice(minGrid - 1).flatMap((n) => drivers.find((d) => d.number === n) ?? [])
 
   return (
     <div className="prediction-form">
       <div className="prediction-form__header">
         <h2>{prediction.playerName}'s prediction</h2>
         <div className="prediction-form__actions">
-          <button className="button button--ghost" onClick={() => onChange({ top10: grid.slice(0, 10) })}>
-            Fill top 10 with starting grid
+          <button className="button button--ghost" onClick={() => onChange({ positions: grid.slice(0, size) })}>
+            Fill top {size} with starting grid
           </button>
           <button className="button button--ghost button--danger" onClick={onRemove}>
             Remove player
@@ -99,8 +111,8 @@ function PredictionForm({ drivers, grid, prediction, onChange, onRemove }: FormP
 
       <div className="prediction-form__columns">
         <fieldset>
-          <legend>Top 10</legend>
-          {prediction.top10.map((driver, i) => (
+          <legend>{kind === 'sprint' ? 'Sprint top 3' : 'Top 10'}</legend>
+          {prediction.positions.map((driver, i) => (
             <DriverSelect
               key={i}
               label={`P${i + 1}`}
@@ -111,27 +123,38 @@ function PredictionForm({ drivers, grid, prediction, onChange, onRemove }: FormP
             />
           ))}
         </fieldset>
-        <fieldset>
-          <legend>Extras</legend>
-          <DriverSelect
-            label="Last place"
-            drivers={drivers}
-            value={prediction.last}
-            onChange={(last) => onChange({ last })}
-          />
-          <DriverSelect
-            label="Fastest lap"
-            drivers={drivers}
-            value={prediction.fastestLap}
-            onChange={(fastestLap) => onChange({ fastestLap })}
-          />
-          <DriverSelect
-            label="Drops out"
-            drivers={drivers}
-            value={prediction.dnf}
-            onChange={(dnf) => onChange({ dnf })}
-          />
-        </fieldset>
+        {kind === 'race' && (
+          <fieldset>
+            <legend>Extras</legend>
+            <DriverSelect
+              label="Joker"
+              drivers={jokerCandidates}
+              value={prediction.joker}
+              onChange={(joker) => onChange({ joker })}
+            />
+            <p className="hint">Starts P{minGrid} or lower. Finishes in the top 10 → points = his starting position.</p>
+            <DriverSelect
+              label="Last finisher"
+              drivers={drivers}
+              value={prediction.last}
+              onChange={(last) => onChange({ last })}
+            />
+            <p className="hint">Last classified finisher — a dropout doesn't count.</p>
+            <DriverSelect
+              label="Fastest lap"
+              drivers={drivers}
+              value={prediction.fastestLap}
+              onChange={(fastestLap) => onChange({ fastestLap })}
+            />
+            <DriverSelect
+              label="Dropout"
+              drivers={drivers}
+              value={prediction.dnf}
+              onChange={(dnf) => onChange({ dnf })}
+            />
+            <p className="hint">Must have started the race. All three of last, fastest lap and dropout right: +10 bonus.</p>
+          </fieldset>
+        )}
       </div>
     </div>
   )

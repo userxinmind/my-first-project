@@ -14,6 +14,7 @@ Use **[OpenF1](https://openf1.org)** (open source, [github.com/br-g/openf1](http
 
 - Free and no API key for **historical data from 2023 onwards**. CORS-enabled, so the browser can
   call it directly.
+- Races and sprints: `sessions?session_type=Race` returns both (`session_name` "Race" or "Sprint").
 - Time-stamped data: `position` (every position change), `laps` (lap start + duration),
   `session_result` (final classification with `dnf` / `dns` / `dsq`), `drivers` (codes, team colours),
   `sessions` / `meetings` (race list and names).
@@ -25,6 +26,7 @@ How the data is interpreted:
 - Lap *completion* time = start of the next lap (or start + duration for the last lap).
 - Race start = start of lap 1; race end = last lap completed.
 - Drop-outs = `dnf`/`dns` in the official result, placed 30 s after the driver's last lap.
+  `dns` drivers are marked separately: under our rules they don't count as a dropout.
   During a live race there is no result yet, so a driver who hasn't completed a lap for 5 minutes
   while others have is assumed out.
 

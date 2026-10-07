@@ -1,4 +1,4 @@
-import type { Driver, LapEvent, PositionEvent, RaceTimeline, RetirementEvent } from '../domain/types'
+import type { Driver, LapEvent, PositionEvent, RaceTimeline, RetirementEvent, SessionKind } from '../domain/types'
 
 /**
  * Client for the OpenF1 API (https://openf1.org) — open source, free for historical data
@@ -57,12 +57,13 @@ export interface OpenF1Result {
 export interface RaceSummary {
   id: string
   sessionKey: number
+  kind: SessionKind
   name: string
   date: string
 }
 
 export interface RawRaceData {
-  session: Pick<OpenF1Session, 'session_key' | 'date_start' | 'date_end'>
+  session: Pick<OpenF1Session, 'session_key' | 'session_name' | 'date_start' | 'date_end'>
   name: string
   drivers: OpenF1Driver[]
   laps: OpenF1Lap[]
@@ -86,20 +87,27 @@ async function getJson<T>(path: string, fetchFn: FetchFn, retries = 2): Promise<
   return (await response.json()) as T[]
 }
 
-/** All Grand Prix races of a season that have started already, oldest first. */
+export const kindOf = (sessionName: string): SessionKind => (sessionName === 'Sprint' ? 'sprint' : 'race')
+
+/** All Grand Prix races and sprints of a season that have started already, oldest first. */
 export async function fetchRaces(year: number, fetchFn: FetchFn = fetch, now = Date.now()): Promise<RaceSummary[]> {
-  const sessions = await getJson<OpenF1Session>(`/sessions?year=${year}&session_name=Race`, fetchFn)
+  const sessions = await getJson<OpenF1Session>(`/sessions?year=${year}&session_type=Race`, fetchFn)
   const meetings = await getJson<OpenF1Meeting>(`/meetings?year=${year}`, fetchFn)
   const meetingNames = new Map(meetings.map((m) => [m.meeting_key, m.meeting_name]))
   return sessions
-    .filter((s) => Date.parse(s.date_start) <= now)
+    .filter((s) => (s.session_name === 'Race' || s.session_name === 'Sprint') && Date.parse(s.date_start) <= now)
     .sort((a, b) => Date.parse(a.date_start) - Date.parse(b.date_start))
-    .map((s) => ({
-      id: `openf1-${s.session_key}`,
-      sessionKey: s.session_key,
-      name: meetingNames.get(s.meeting_key) ?? `${s.country_name} (${s.location})`,
-      date: s.date_start,
-    }))
+    .map((s) => {
+      const kind = kindOf(s.session_name)
+      const meeting = meetingNames.get(s.meeting_key) ?? `${s.country_name} (${s.location})`
+      return {
+        id: `openf1-${s.session_key}`,
+        sessionKey: s.session_key,
+        kind,
+        name: kind === 'sprint' ? `${meeting} – Sprint` : meeting,
+        date: s.date_start,
+      }
+    })
 }
 
 /** Downloads all data of one race and turns it into a timeline. Requests run one by one (rate limit). */
@@ -144,6 +152,7 @@ export function buildTimeline(raw: RawRaceData): RaceTimeline {
   return {
     id: `openf1-${raw.session.session_key}`,
     name: raw.name,
+    kind: kindOf(raw.session.session_name),
     drivers,
     totalLaps,
     startMs,
@@ -216,7 +225,7 @@ function findRetirements(
   if (results.length > 0) {
     return results
       .filter((r) => r.dnf || r.dns)
-      .map((r) => ({ driver: r.driver_number, t: r.dns ? startMs : retireTime(r.driver_number) }))
+      .map((r) => (r.dns ? { driver: r.driver_number, t: startMs, dns: true } : { driver: r.driver_number, t: retireTime(r.driver_number) }))
       .sort((a, b) => a.t - b.t)
   }
 

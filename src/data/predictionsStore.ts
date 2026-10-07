@@ -1,4 +1,4 @@
-import type { Prediction } from '../domain/types'
+import type { Prediction, SessionKind } from '../domain/types'
 
 /**
  * Predictions are stored in the browser (localStorage), per race.
@@ -10,7 +10,9 @@ const keyFor = (raceId: string) => `f1-predictions:${raceId}`
 export function loadPredictions(raceId: string): Prediction[] {
   try {
     const raw = localStorage.getItem(keyFor(raceId))
-    return raw ? (JSON.parse(raw) as Prediction[]) : []
+    const predictions = raw ? (JSON.parse(raw) as Prediction[]) : []
+    // Skip data saved by older versions of the app.
+    return predictions.filter((p) => Array.isArray(p.positions))
   } catch {
     return []
   }
@@ -24,11 +26,12 @@ export function savePredictions(raceId: string, predictions: Prediction[]): void
   }
 }
 
-export function emptyPrediction(playerName: string): Prediction {
+export function emptyPrediction(playerName: string, kind: SessionKind): Prediction {
   return {
     playerId: crypto.randomUUID(),
     playerName,
-    top10: Array.from({ length: 10 }, () => null),
+    positions: Array.from({ length: kind === 'sprint' ? 3 : 10 }, () => null),
+    joker: null,
     last: null,
     fastestLap: null,
     dnf: null,

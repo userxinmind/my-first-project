@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { snapshotAt } from '../domain/snapshot'
-import { createDemoRace } from './demoRace'
+import { createDemoRace, createDemoSprint } from './demoRace'
 
 describe('createDemoRace', () => {
   const race = createDemoRace()
@@ -31,5 +31,14 @@ describe('createDemoRace', () => {
     const grid = snapshotAt(race, race.startMs).order
     const halfway = snapshotAt(race, (race.startMs + race.endMs) / 2).order
     expect(halfway).not.toEqual(grid.filter((d) => halfway.includes(d)))
+  })
+})
+
+describe('createDemoSprint', () => {
+  it('is a short sprint race', () => {
+    const sprint = createDemoSprint()
+    expect(sprint.kind).toBe('sprint')
+    expect(sprint.totalLaps).toBe(12)
+    expect(snapshotAt(sprint, sprint.endMs).finished).toBe(true)
   })
 })

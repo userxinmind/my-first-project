@@ -7,10 +7,8 @@ import type { RaceSnapshot, RaceTimeline } from './types'
 export function snapshotAt(timeline: RaceTimeline, t: number): RaceSnapshot {
   const finished = t >= timeline.endMs
 
-  const retired = timeline.retirements
-    .filter((r) => r.t <= t)
-    .sort((a, b) => a.t - b.t)
-    .map((r) => r.driver)
+  const out = timeline.retirements.filter((r) => r.t <= t).sort((a, b) => a.t - b.t)
+  const retired = out.map((r) => r.driver)
   const retiredSet = new Set(retired)
 
   let order: number[]
@@ -31,13 +29,24 @@ export function snapshotAt(timeline: RaceTimeline, t: number): RaceSnapshot {
   }
 
   return {
+    kind: timeline.kind,
+    grid: startingGrid(timeline),
     order,
     retired,
+    notStarted: out.filter((r) => r.dns).map((r) => r.driver),
     fastestLap,
     currentLap: finished ? timeline.totalLaps : Math.min(lapsCompleted + 1, timeline.totalLaps),
     totalLaps: timeline.totalLaps,
     finished,
   }
+}
+
+/**
+ * The order in which the cars line up at the start (the last known position before the start).
+ * Used for the joker (see docs/decisions/0003-scoring-rules.md).
+ */
+export function startingGrid(timeline: RaceTimeline): number[] {
+  return runningOrderAt(timeline, timeline.startMs)
 }
 
 /**

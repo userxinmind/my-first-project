@@ -1,10 +1,11 @@
-import type { Driver, LapEvent, PositionEvent, RaceTimeline, RetirementEvent } from '../domain/types'
+import type { Driver, LapEvent, PositionEvent, RaceTimeline, RetirementEvent, SessionKind } from '../domain/types'
 
 /**
  * A made-up race that works without internet. Useful for trying the app and for tests.
  * It is generated from a fixed seed, so it is identical every time.
  */
 export const DEMO_RACE_ID = 'demo'
+export const DEMO_SPRINT_ID = 'demo-sprint'
 
 const DEMO_DRIVERS: Driver[] = [
   { number: 1, code: 'VER', name: 'Max Verstappen', team: 'Red Bull Racing', teamColor: '#3671C6' },
@@ -40,7 +41,25 @@ function seededRandom(seed: number): () => number {
   }
 }
 
-export function createDemoRace(seed = 2026, totalLaps = 30): RaceTimeline {
+/** Demo Grand Prix: 30 laps. */
+export function createDemoRace(): RaceTimeline {
+  return generateRace({ id: DEMO_RACE_ID, name: 'Demo Grand Prix (offline)', kind: 'race', seed: 2026, totalLaps: 30 })
+}
+
+/** Demo Sprint: 12 laps. */
+export function createDemoSprint(): RaceTimeline {
+  return generateRace({ id: DEMO_SPRINT_ID, name: 'Demo Sprint (offline)', kind: 'sprint', seed: 7, totalLaps: 12 })
+}
+
+interface GenerateOptions {
+  id: string
+  name: string
+  kind: SessionKind
+  seed: number
+  totalLaps: number
+}
+
+function generateRace({ id, name, kind, seed, totalLaps }: GenerateOptions): RaceTimeline {
   const random = seededRandom(seed)
   const startMs = Date.UTC(2026, 2, 8, 15, 0, 0)
 
@@ -51,7 +70,7 @@ export function createDemoRace(seed = 2026, totalLaps = 30): RaceTimeline {
     .sort((a, b) => a.quali - b.quali)
     .map((g) => g.driver)
 
-  // Two drivers drop out on fixed-but-random laps; everybody pits once.
+  // Two drivers drop out on fixed-but-random laps (if the race is long enough); everybody pits once in a race.
   const retiresAfterLap = new Map([
     [grid[13], 4 + Math.floor(random() * 6)],
     [grid[4], 15 + Math.floor(random() * 8)],
@@ -68,7 +87,7 @@ export function createDemoRace(seed = 2026, totalLaps = 30): RaceTimeline {
   for (let lap = 1; lap <= totalLaps; lap++) {
     for (const driver of running) {
       const tyreDrop = lap * 0.03
-      const pit = pitLap.get(driver) === lap ? 21 : 0
+      const pit = kind === 'race' && pitLap.get(driver) === lap ? 21 : 0
       const firstLap = lap === 1 ? 6 : 0
       const duration = pace.get(driver)! + tyreDrop + pit + firstLap + (random() - 0.5) * 1.6
       elapsed.set(driver, elapsed.get(driver)! + duration)
@@ -88,8 +107,9 @@ export function createDemoRace(seed = 2026, totalLaps = 30): RaceTimeline {
   laps.sort((a, b) => a.t - b.t)
   positions.sort((a, b) => a.t - b.t)
   return {
-    id: DEMO_RACE_ID,
-    name: 'Demo Grand Prix (offline)',
+    id,
+    name,
+    kind,
     drivers: [...DEMO_DRIVERS].sort((a, b) => a.number - b.number),
     totalLaps,
     startMs,

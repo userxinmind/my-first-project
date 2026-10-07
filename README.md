@@ -4,24 +4,24 @@ Live score tracker for our Formula 1 prediction game with friends.
 During a race it shows **how many points each player would have if the race stopped right now**,
 and **why** the score changes (which predictions are right, partly right or wrong).
 
-![status](https://img.shields.io/badge/status-v0.1-red)
+![status](https://img.shields.io/badge/status-v0.2-red)
 
 ## What it does
 
-1. **Pick a race**: any Grand Prix from 2023 onwards (data from [OpenF1](https://openf1.org)),
-   or the built-in **Demo Grand Prix** that works offline.
-2. **Fill in predictions** for one or more players: top 10, last place, fastest lap and
-   who drops out. A "fill with starting grid" shortcut helps for quick testing.
+1. **Pick a race or sprint**: any Grand Prix or sprint from 2023 onwards (data from [OpenF1](https://openf1.org)),
+   or the built-in **Demo Grand Prix / Demo Sprint** that work offline.
+2. **Fill in predictions** for one or more players: top 10, joker, last finisher, fastest lap and
+   dropout (sprint: top 3). A "fill with starting grid" shortcut helps for quick testing.
 3. **Replay the race** in fast-forward (the whole race in 1, 3, 5 or 10 minutes) and watch:
    - the running order, with your predicted positions marked ✓ / ≈ / ✗,
    - the standings between players "if the race stopped now",
-   - each prediction's points and the reason,
+   - each prediction's points and the reason, plus the Bierbonus 🍺,
    - a chart of your points during the race and a feed of every score change.
 4. **Follow live** (experimental): during a race weekend, refresh real data every 30 s.
    See [ADR 0002](docs/decisions/0002-f1-data-source.md) for the limits.
 
-> ⚠️ The scoring uses **placeholder points** until the official rules are added — see
-> [docs/game-rules.md](docs/game-rules.md).
+Scoring follows our official rules, "De Karre" 2026 — summary in
+[docs/game-rules.md](docs/game-rules.md), original in [docs/F1_regelement_2026.pdf](docs/F1_regelement_2026.pdf).
 
 ## Getting started
 
@@ -58,7 +58,7 @@ src/
     history.ts     Score over the whole race (feed + chart)
   data/          Getting data in and out
     openf1.ts      OpenF1 API client + mapping to a RaceTimeline
-    demoRace.ts    Generated offline demo race
+    demoRace.ts    Generated offline demo race and sprint
     races.ts       Race list helpers (demo vs. OpenF1, live window)
     predictionsStore.ts  Predictions saved in the browser (localStorage)
   simulation/    Fast-forward replay clock (pure functions + React hook)
@@ -66,7 +66,8 @@ src/
   App.tsx        Page layout and state
 docs/
   decisions/     Architecture Decision Records (why we chose what)
-  game-rules.md  The rules of our game
+  game-rules.md  The rules of our game (summary + how the app applies them)
+  F1_regelement_2026.pdf  The official rules document
 ```
 
 Tests live next to the code they test (`*.test.ts(x)`).

@@ -89,6 +89,7 @@ export default function App() {
         ) : tab === 'predictions' ? (
           <PredictionsEditor
             key={race.id}
+            kind={timeline.kind}
             drivers={timeline.drivers}
             grid={grid}
             predictions={predictions}

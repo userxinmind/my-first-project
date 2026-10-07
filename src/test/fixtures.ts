@@ -16,6 +16,7 @@ export function tinyRace(overrides: Partial<RaceTimeline> = {}): RaceTimeline {
   return {
     id: 'tiny',
     name: 'Tiny GP',
+    kind: 'race',
     drivers: [driver(1, 'AAA'), driver(2, 'BBB'), driver(3, 'CCC'), driver(4, 'DDD')],
     totalLaps: 3,
     startMs: sec(0),
@@ -44,9 +45,13 @@ export function tinyRace(overrides: Partial<RaceTimeline> = {}): RaceTimeline {
 }
 
 export function snapshot(overrides: Partial<RaceSnapshot> = {}): RaceSnapshot {
+  const twenty = Array.from({ length: 20 }, (_, i) => i + 1)
   return {
-    order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    kind: 'race',
+    grid: twenty,
+    order: twenty,
     retired: [],
+    notStarted: [],
     fastestLap: null,
     currentLap: 1,
     totalLaps: 50,
@@ -59,7 +64,8 @@ export function prediction(overrides: Partial<Prediction> = {}): Prediction {
   return {
     playerId: 'p1',
     playerName: 'Alex',
-    top10: Array.from({ length: 10 }, () => null),
+    positions: Array.from({ length: 10 }, () => null),
+    joker: null,
     last: null,
     fastestLap: null,
     dnf: null,
